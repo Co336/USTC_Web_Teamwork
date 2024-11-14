@@ -1,17 +1,40 @@
 import pandas as pd
+import pickle
+import shelve
+
+def hash_function(input_str):
+    hash_value = 0
+    prime_number = 31  # 质数因子，帮助避免哈希冲突
+    max_hash_value = 81919  # 哈希表大小（质数大小）
+    
+    for char in input_str:
+        # 获取字符的GB18030编码
+        encoded_char = char.encode('gb18030')
+        
+        # 将字符的每个字节的值与hash_value结合
+        for byte in encoded_char:
+            hash_value = hash_value * prime_number + byte
+            
+            # 使用位操作防止溢出
+            hash_value &= 0xFFFFFFFFFFFFFFFF  # 限制哈希值范围，确保64位
+    
+    # 最终的哈希值映射到[0, max_hash_value]范围
+    hash_value = hash_value % max_hash_value
+    
+    return hash_value
+
 
 file_book_keywords_csv = "part-2 index-table\\book_keywords.csv"
 file_movie_keywords_csv = "part-2 index-table\movie_keywords.csv"
 
-# 建立token索引表
+# 建立顺序token索引表
 def csv_to_index_table(csvfile):
     index_table = {}
     content = pd.read_csv(csvfile, delimiter=',', header=None, index_col=False)
     idlist = content[0].values
     tokenlist = content[1].values
     for i in range(1,len(idlist)):
-        tokens = tokenlist[i].replace("'","").replace("[","").replace("]","").replace(" ","")
-        tokens = tokens.split(",")
+        tokens = eval(tokenlist[i])
         for token in tokens:
             if not index_table.get(token):
                 index_table[token] = [idlist[i]]
@@ -44,25 +67,56 @@ def skip_list_build(index_table):
         skip_list = []
     return index_table
 
-def write_index_table_to_csv(file,index_table):
-    data={}
-    names = []
-    index_list = []
-    for name in index_table.keys():
-        names.append(name)
-        index_list.append(index_table[name])
-    data["Token"] = names
-    data["Index"] = index_list
-    df = pd.DataFrame(data)
-    df.to_csv(file,index=False)
+# 索引表存储优化(哈希存储)
+def hash_index_table_storage(index_table,file_hash_list,file_index_list):
+    # 将词项和索引表分别存于两个文件中，通过hash表查找词项，再根据词项索引在索引表中查找
+    # 将词项放进pkl文件，方便直接载入内存，索引表放入shelve文件中，方便根据索引部分查询
+    hashlist = [[] for _ in range(81919)]
+    indexlist = []
+    i = 0 
+    for key in index_table.keys():
+        hashlist[hash_function(key)].append([key,i])
+        indexlist.append(index_table[key])
+        i+=1
+    with open(file_hash_list, 'wb') as hash:
+        pickle.dump(hashlist, hash)
+    with shelve.open(file_index_list) as db:
+        for idx, item in enumerate(indexlist):
+            db[str(idx)] = item  # 使用索引作为键存储数据
 
 
-book_index_table = csv_to_index_table(file_book_keywords_csv)
-book_index_table_sorted = sort_index_table(book_index_table)
-book_index_table_skip_builded = skip_list_build(book_index_table_sorted)
-write_index_table_to_csv("part-2 index-table\\book_index_table",book_index_table_skip_builded)
+# 基于hash的查找
+def hash_search(name,file_hash_list,file_index_list):
+    with open(file_hash_list, 'rb') as f:
+        hash_list = pickle.load(f)
+    for lst in hash_list[hash_function(name)]:
+        if lst[0] == name:
+            with shelve.open(file_index_list) as db:
+                return db.get(str(lst[1]), None)  # 通过索引读取数据
 
-movie_index_table = csv_to_index_table(file_movie_keywords_csv)
-movie_index_table_sorted = sort_index_table(movie_index_table)
-movie_index_table_skip_builded = skip_list_build(movie_index_table_sorted)
-write_index_table_to_csv("part-2 index-table\movie_index_table",movie_index_table_skip_builded)
+
+# 建立顺序索引表
+# def write_index_table_to_csv(file,index_table):
+#     data={}
+#     names = []
+#     index_list = []
+#     for name in index_table.keys():
+#         names.append(name)
+#         index_list.append(index_table[name])
+#     data["Token"] = names
+#     data["Index"] = index_list
+#     df = pd.DataFrame(data)
+#     df.to_csv(file,index=False)
+
+
+# book_index_table = csv_to_index_table(file_book_keywords_csv)
+# book_index_table_sorted = sort_index_table(book_index_table)
+# book_index_table_skip_builded = skip_list_build(book_index_table_sorted)
+# hash_index_table_storage(book_index_table_skip_builded,'part-2 index-table\\book_hash_list.pkl','part-2 index-table\\book_index_list')
+print(hash_search("封面",'part-2 index-table\\book_hash_list.pkl','part-2 index-table\\book_index_list'))
+
+# movie_index_table = csv_to_index_table(file_movie_keywords_csv)
+# movie_index_table_sorted = sort_index_table(movie_index_table)
+# movie_index_table_skip_builded = skip_list_build(movie_index_table_sorted)
+# hash_index_table_storage(movie_index_table_skip_builded,'part-2 index-table\movie_hash_list.pkl','part-2 index-table\movie_index_list')
+print(hash_search("雷人",'part-2 index-table\movie_hash_list.pkl','part-2 index-table\movie_index_list'))
