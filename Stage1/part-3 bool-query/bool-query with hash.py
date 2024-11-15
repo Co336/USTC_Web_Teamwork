@@ -2,19 +2,7 @@ import pandas as pd
 import pickle
 import shelve
 import re
-
-# 顺序索引表(已弃用)
-file_book_index_table_csv = "part-3 bool-query\\book_index_table.csv"
-file_movie_index_table_csv = "part-3 bool-query\movie_index_table.csv"
-
-def csv_to_dict(csvfile):
-    dict = {}
-    content = pd.read_csv(csvfile, delimiter=',', header=None, index_col=False)
-    keys = content[0].values
-    values = content[1].values
-    for i in range(1,len(keys)):
-        dict[keys[i]] = eval(values[i])
-    return dict
+import math
 
 def hash_function(input_str):
     hash_value = 0
@@ -59,9 +47,9 @@ def get_all_name(txtfile):
     return namelist
 
 
-# 跳表索引映射规则,这里默认每跳为3
-def skip_index(key):
-    return 3*(key+1)-1
+# 跳表索引映射规则,这里每跳为根号L
+def skip_index(key,len):
+    return math.floor(math.sqrt(len))*(key+1)-1
 
 # bool查询函数
 def merge_AND(list_key_a, list_key_b):
@@ -83,7 +71,7 @@ def merge_AND(list_key_a, list_key_b):
             if k < len(search_list[1]):
                 skip_id = search_list[1][k]
                 if current_id >= skip_id:
-                    j = skip_index(k)
+                    j = skip_index(k,len(search_list[0]))
                     k+=1
                     continue
             # 找到合适区间后再在搜索列表中查找
@@ -98,9 +86,10 @@ def merge_AND(list_key_a, list_key_b):
                 break
     # 合并列表后在此基础上建立跳表
     skip_list = []
-    step = 3 
-    for i in range(1,len(And_list)//step+1):
-        skip_list.append(And_list[step*i-1])
+    if And_list:
+        step = math.floor(math.sqrt(len(And_list))) 
+        for i in range(1,len(And_list)//step+1):
+            skip_list.append(And_list[step*i-1])
     And_list = [And_list,skip_list]
     return And_list
 
@@ -124,7 +113,7 @@ def merge_OR(list_key_a, list_key_b):
             if k < len(search_list[1]):
                 skip_id = search_list[1][k]
                 if current_id >= skip_id:
-                    j = skip_index(k)
+                    j = skip_index(k,len(search_list[0]))
                     k+=1
                     continue
             # 找到合适区间后再在搜索列表中查找
@@ -139,9 +128,10 @@ def merge_OR(list_key_a, list_key_b):
                 break
     # 合并列表后在此基础上建立跳表
     skip_list = []
-    step = 3 
-    for i in range(1,len(OR_list)//step+1):
-        skip_list.append(OR_list[step*i-1])
+    if OR_list:
+        step = math.floor(math.sqrt(len(OR_list))) 
+        for i in range(1,len(OR_list)//step+1):
+            skip_list.append(OR_list[step*i-1])
     OR_list = [OR_list,skip_list]
     return OR_list
 
@@ -165,7 +155,7 @@ def merge_ANDNOT(list_key_a, list_key_b):
             if k < len(search_list[1]):
                 skip_id = search_list[1][k]
                 if current_id >= skip_id:
-                    j = skip_index(k)
+                    j = skip_index(k,len(search_list[0]))
                     k+=1
                     continue
             # 找到合适区间后再在搜索列表中查找
@@ -180,9 +170,10 @@ def merge_ANDNOT(list_key_a, list_key_b):
                 break
     # 合并列表后在此基础上建立跳表
     skip_list = []
-    step = 3 
-    for i in range(1,len(ANDNOT_list)//step+1):
-        skip_list.append(ANDNOT_list[step*i-1])
+    if ANDNOT_list:
+        step = math.floor(math.sqrt(len(ANDNOT_list)))  
+        for i in range(1,len(ANDNOT_list)//step+1):
+            skip_list.append(ANDNOT_list[step*i-1])
     ANDNOT_list = [ANDNOT_list,skip_list]
     return ANDNOT_list
 
@@ -271,5 +262,5 @@ def Movie_bool_query():
     result = parser.evaluate(query)[0]
     print(f"Query result:\n {result}")
 
-# Book_bool_query()
-Movie_bool_query()
+Book_bool_query()
+# Movie_bool_query()

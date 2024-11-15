@@ -23,3 +23,5 @@ book_index_list(.bak .dat .dir)：电影hash对应的索引表文件
 bool-query.py：基于顺序索引文件的布尔查询
 
 bool-query with hash.py：基于hash存储索引文件的布尔查询
+
+bool-query with hash better.py：在基于hash存储索引文件的布尔查询基础上，优化了词项处理顺序
